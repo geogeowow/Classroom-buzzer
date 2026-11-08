@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>六組即時搶答</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#172033;background:#f3f6fb}
+*{box-sizing:border-box}body{margin:0;padding:20px}.wrap{max-width:1050px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:clamp(24px,4vw,36px);margin:8px 0}h2{margin:0 0 12px;font-size:20px}
+.sub{color:#64748b}.panel{background:white;border:1px solid #e2e8f0;border-radius:18px;padding:20px;margin:16px 0;box-shadow:0 5px 20px #1720330a}
+.tabs{display:flex;gap:8px}.tab,button{border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer}
+.tab{background:#e7edf6;color:#334155}.tab.active{background:#172033;color:white}
+button.primary{background:#2563eb;color:white}button.good{background:#059669;color:white}button.dark{background:#172033;color:white}button.light{background:#e8eef7;color:#172033}
+button:disabled{opacity:.45;cursor:not-allowed}
+input{padding:13px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px;width:100%;max-width:320px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.hidden{display:none!important}
+.bigcode{font-size:30px;font-weight:900;letter-spacing:4px;color:#2563eb}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.team{padding:16px;border-radius:14px;background:#f1f5f9;display:flex;justify-content:space-between;align-items:center;font-weight:800}
+.rank{font-size:20px;color:#2563eb;min-width:32px}
+.status{padding:6px 10px;border-radius:99px;background:#e2e8f0;font-size:13px}
+.status.live{background:#dcfce7;color:#166534}.status.closed{background:#fee2e2;color:#991b1b}
+.buzz{width:min(75vw,300px);height:min(75vw,300px);border-radius:50%;font-size:36px;background:#16a34a;color:white;box-shadow:0 9px 0 #166534;margin:22px auto;display:block}
+.buzz:active{transform:translateY(5px);box-shadow:0 4px 0 #166534}
+.center{text-align:center}.muted{color:#64748b;font-size:14px}.notice{padding:12px;border-radius:10px;background:#eff6ff;color:#1e40af;margin-top:12px}
+@media(max-width:650px){body{padding:12px}.grid{grid-template-columns:repeat(2,1fr)}.panel{padding:16px}}
+</style>
+</head>
+<body><div class="wrap">
+<header><div><h1>⚡ 六組即時搶答</h1><div class="sub">學生用手機加入，老師即時查看最快組別</div></div><div class="tabs"><button class="tab active" id="teacherTab">老師端</button><button class="tab" id="studentTab">學生端</button></div></header>
+
+<section id="teacherView">
+<div class="panel">
+<h2>教師控制台</h2>
+<div id="setupTeacher">
+<p class="muted">建立一個搶答教室，系統會產生學生加入碼。</p>
+<button class="primary" id="createRoom">建立新教室</button>
+</div>
+<div id="teacherRoom" class="hidden">
+<div class="row"><div>加入碼： <span class="bigcode" id="roomCode">------</span></div><span id="roundStatus" class="status closed">尚未開始</span></div>
+<p class="muted">請學生開啟此網頁，切換「學生端」，輸入加入碼及組別。</p>
+<div class="row">
+<button class="good" id="startRound">開始搶答</button>
+<button class="light" id="resetRound">重置本題</button>
+<button class="dark" id="newRoom">更換教室</button>
+</div>
+<div class="notice" id="teacherMessage">等待學生加入。開始後，第一個成功送達的組別會排在最前面。</div>
+</div>
+</div>
+<div class="panel">
+<div class="row" style="justify-content:space-between"><h2>即時搶答排名</h2><span class="muted" id="roundLabel">第 1 題</span></div>
+<div id="leaderboard" class="grid"></div>
+<p class="muted">排名依雲端資料庫成功寫入的先後順序；同一組每題只能搶答一次。</p>
+</div>
+</section>
+
+<section id="studentView" class="hidden">
+<div class="panel center">
+<h2>學生搶答區</h2>
+<div id="studentJoin">
+<p class="muted">輸入老師提供的六位加入碼，並選擇組別。</p>
+<div style="max-width:360px;margin:auto;display:grid;gap:12px">
+<input id="joinCode" placeholder="六位加入碼" maxlength="6" autocomplete="off">
+<select id="teamSelect" style="padding:13px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px"><option value="">選擇組別</option></select>
+<button class="primary" id="joinButton">加入教室</button>
+</div>
+<div id="joinMessage" class="muted" style="margin-top:12px"></div>
+</div>
+<div id="studentPlay" class="hidden">
+<div class="muted">目前代表</div><h2 id="myTeam" style="font-size:28px"></h2>
+<div id="studentStatus" class="status closed">等待老師開始</div>
+<button class="buzz" id="buzzButton" disabled>搶答！</button>
+<div id="studentMessage" class="muted">老師開始後即可按下按鈕</div>
+<button class="light" id="leaveButton">離開／更換組別</button>
+</div>
+</div>
+</section>
+<footer class="muted center">使用提醒：每組建議由一支手機負責按鈕，避免同組多人操作造成混亂。</footer>
+</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// 先到 Firebase Console 建立專案，將下方設定換成自己的 Firebase Web App 設定。
+const firebaseConfig = {
+  apiKey: "AIzaSyBmK4W0qrn6ZZGqx7ddIL-rKC6FKskoqYg",
+  authDomain: "classroom-d0473.firebaseapp.com",
+  databaseURL: "https://classroom-d0473-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "classroom-d0473",
+  storageBucket: "classroom-d0473.firebasestorage.app",
+  messagingSenderId: "100985888719",
+  appId: "1:100985888719:web:35c1eb5a9904cb29af7cba",
+  measurementId: "G-WTKZ9QDK5J"
+};
+const $=id=>document.getElementById(id), teams=Array.from({length:6},(_,i)=>`第${i+1}組`);
+teams.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i+1);o.textContent=t;$('teamSelect').append(o)});
+let db,uid,room=null,roomData=null,stopRoom=null,stopStudent=null,myTeamNo=null,roundNo=1,alreadyBuzzed=false;
+const configured=Object.values(firebaseConfig).every(v=>v && !v.includes("請填入"));
+if(configured){
+ try{
+  const app=initializeApp(firebaseConfig);db=getDatabase(app);
+  const auth=getAuth(app);const cred=await signInAnonymously(auth);uid=cred.user.uid;
+ }catch(e){alert("Firebase 連線失敗："+e.message)}
+}else{
+ $('teacherMessage').textContent="尚未設定 Firebase。請先依操作說明完成雲端資料庫設定，再重新部署網頁。";
+ $('joinMessage').textContent="此網頁尚未連接雲端資料庫，請老師先完成設定。";
+}
+function randomCode(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+function roomRef(){return ref(db,`rooms/${room}`)}
+function stopListeners(){if(stopRoom)stopRoom();if(stopStudent)stopStudent();stopRoom=stopStudent=null}
+function showRoom(data){
+ roomData=data||{};roundNo=data?.round||1;
+ $('roundLabel').textContent=`第 ${roundNo} 題`;
+ const live=!!data?.active;
+ $('roundStatus').textContent=live?"搶答進行中":"尚未開始";
+ $('roundStatus').className="status "+(live?"live":"closed");
+ $('startRound').disabled=live;$('resetRound').disabled=!data;
+ const answers=Object.values(data?.answers||{}).sort((a,b)=>a.rank-b.rank);
+ $('leaderboard').innerHTML='';
+ const byTeam={};answers.forEach(a=>byTeam[a.team]=a);
+ teams.forEach((t,i)=>{
+  const a=byTeam[String(i+1)],el=document.createElement('div');el.className='team';
+  el.innerHTML=`<span><span class="rank">${a?'#'+a.rank:'—'}</span> ${t}</span><span>${a?((a.elapsedMs/1000).toFixed(2)+' 秒'):'未搶答'}</span>`;
+  $('leaderboard').append(el);
+ });
+ $('teacherMessage').textContent=live?"搶答已開放，排名會自動更新。":(answers.length?`本題已收到 ${answers.length} 組搶答。可重置進行下一題。`:"等待學生加入；準備好後按「開始搶答」。");
+ if(myTeamNo){
+  $('studentStatus').textContent=live?"搶答開放！":"等待老師開始";
+  $('studentStatus').className="status "+(live?"live":"closed");
+  $('buzzButton').disabled=!live||alreadyBuzzed||!!byTeam[String(myTeamNo)];
+  if(byTeam[String(myTeamNo)]){$('studentMessage').textContent=`已完成搶答，排名第 ${byTeam[String(myTeamNo)].rank} 名。`;}
+  else if(alreadyBuzzed){$('studentMessage').textContent="搶答訊號已送出，等待同步結果…";}
+  else $('studentMessage').textContent=live?"按下綠色按鈕送出搶答！":"老師開始後即可按下按鈕";
+ }
+}
+function subscribe(){stopListeners();stopRoom=onValue(roomRef(),s=>showRoom(s.val()));}
+$('teacherTab').onclick=()=>switchTab('teacher');$('studentTab').onclick=()=>switchTab('student');
+function switchTab(which){$('teacherView').classList.toggle('hidden',which!=='teacher');$('studentView').classList.toggle('hidden',which!=='student');$('teacherTab').classList.toggle('active',which==='teacher');$('studentTab').classList.toggle('active',which==='student')}
+$('createRoom').onclick=async()=>{
+ if(!db)return;room=randomCode();await set(roomRef(),{active:false,round:1,startedAt:null,answers:{},createdAt:serverTimestamp()});
+ $('setupTeacher').classList.add('hidden');$('teacherRoom').classList.remove('hidden');$('roomCode').textContent=room;subscribe();
+};
+$('newRoom').onclick=()=>{stopListeners();room=null;$('teacherRoom').classList.add('hidden');$('setupTeacher').classList.remove('hidden');$('leaderboard').innerHTML='';};
+$('startRound').onclick=async()=>{if(!room)return;await set(ref(db,`rooms/${room}/answers`),{});await set(ref(db,`rooms/${room}/startedAt`),serverTimestamp());await set(ref(db,`rooms/${room}/active`),true);};
+$('resetRound').onclick=async()=>{if(!room)return;const snap=await get(roomRef()),d=snap.val()||{};await set(roomRef(),{...d,active:false,round:(d.round||1)+1,startedAt:null,answers:{}});roundNo++};
+$('joinButton').onclick=async()=>{
+ if(!db)return;const code=$('joinCode').value.trim().toUpperCase(),n=$('teamSelect').value;
+ if(!/^[A-Z0-9]{6}$/.test(code)||!n){$('joinMessage').textContent="請輸入六位加入碼並選擇組別。";return}
+ const snap=await get(ref(db,`rooms/${code}`));if(!snap.exists()){$('joinMessage').textContent="找不到教室，請確認加入碼。";return}
+ room=code;myTeamNo=n;alreadyBuzzed=false;$('studentJoin').classList.add('hidden');$('studentPlay').classList.remove('hidden');$('myTeam').textContent=teams[Number(n)-1];subscribe();switchTab('student');
+};
+$('leaveButton').onclick=()=>{stopListeners();room=null;myTeamNo=null;alreadyBuzzed=false;$('studentPlay').classList.add('hidden');$('studentJoin').classList.remove('hidden');$('joinMessage').textContent="已離開教室。"};
+$('buzzButton').onclick=async()=>{
+ if(!room||!myTeamNo||alreadyBuzzed)return;alreadyBuzzed=true;$('buzzButton').disabled=true;$('studentMessage').textContent="正在送出…";
+ const answersRef=ref(db,`rooms/${room}/answers`);let outcome=null;
+ try{
+  const result=await runTransaction(answersRef,current=>{
+   if(!current)current={};
+   if(current[String(myTeamNo)])return;
+   const rank=Object.keys(current).length+1;
+   current[String(myTeamNo)]={team:String(myTeamNo),rank,elapsedMs:Date.now()-Number(roomData?.startedAt||Date.now()),uid,receivedAt:serverTimestamp()};
+   return current;
+  });
+  if(result.committed){outcome=result.snapshot.val()?.[String(myTeamNo)];$('studentMessage').textContent=outcome?`搶答成功！目前排名第 ${outcome.rank} 名。`:"搶答已送出。";}
+  else $('studentMessage').textContent="本組已經搶答過了。";
+ }catch(e){alreadyBuzzed=false;$('studentMessage').textContent="送出失敗，請確認網路後再試。";}
+};
+</script></body></html>
