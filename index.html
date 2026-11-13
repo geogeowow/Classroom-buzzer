@@ -97,6 +97,7 @@ const firebaseConfig = {
 const $=id=>document.getElementById(id), teams=Array.from({length:6},(_,i)=>`第${i+1}組`);
 teams.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i+1);o.textContent=t;$('teamSelect').append(o)});
 let db,uid,room=null,roomData=null,stopRoom=null,stopStudent=null,myTeamNo=null,roundNo=1,alreadyBuzzed=false;
+let lastSeenRound=null;
 const configured=Object.values(firebaseConfig).every(v=>v && !v.includes("請填入"));
 if(configured){
  try{
@@ -111,7 +112,15 @@ function randomCode(){return Math.random().toString(36).slice(2,8).toUpperCase()
 function roomRef(){return ref(db,`rooms/${room}`)}
 function stopListeners(){if(stopRoom)stopRoom();if(stopStudent)stopStudent();stopRoom=stopStudent=null}
 function showRoom(data){
- roomData=data||{};roundNo=data?.round||1;
+ const currentRound=data?.round||1;
+
+ if(lastSeenRound!==null && currentRound!==lastSeenRound){
+  alreadyBuzzed=false;
+ }
+
+ lastSeenRound=currentRound;
+ roomData=data||{};
+ roundNo=currentRound;
  $('roundLabel').textContent=`第 ${roundNo} 題`;
  const live=!!data?.active;
  $('roundStatus').textContent=live?"搶答進行中":"尚未開始";
@@ -144,7 +153,7 @@ $('createRoom').onclick=async()=>{
 };
 $('newRoom').onclick=()=>{stopListeners();room=null;$('teacherRoom').classList.add('hidden');$('setupTeacher').classList.remove('hidden');$('leaderboard').innerHTML='';};
 $('startRound').onclick=async()=>{if(!room)return;await set(ref(db,`rooms/${room}/answers`),{});await set(ref(db,`rooms/${room}/startedAt`),serverTimestamp());await set(ref(db,`rooms/${room}/active`),true);};
-$('resetRound').onclick=async()=>{if(!room)return;const snap=await get(roomRef()),d=snap.val()||{};await set(roomRef(),{...d,active:false,round:(d.round||1)+1,startedAt:null,answers:{}});roundNo++};
+$('resetRound').onclick=async()=>{if(!room)return;const snap=await get(roomRef()),d=snap.val()||{};await set(roomRef(),{...d,active:false,round:(d.round||1)+1,startedAt:null,answers:{}});
 $('joinButton').onclick=async()=>{
  if(!db)return;const code=$('joinCode').value.trim().toUpperCase(),n=$('teamSelect').value;
  if(!/^[A-Z0-9]{6}$/.test(code)||!n){$('joinMessage').textContent="請輸入六位加入碼並選擇組別。";return}
