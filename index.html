@@ -153,7 +153,17 @@ $('createRoom').onclick=async()=>{
 };
 $('newRoom').onclick=()=>{stopListeners();room=null;$('teacherRoom').classList.add('hidden');$('setupTeacher').classList.remove('hidden');$('leaderboard').innerHTML='';};
 $('startRound').onclick=async()=>{if(!room)return;await set(ref(db,`rooms/${room}/answers`),{});await set(ref(db,`rooms/${room}/startedAt`),serverTimestamp());await set(ref(db,`rooms/${room}/active`),true);};
-$('resetRound').onclick=async()=>{if(!room)return;const snap=await get(roomRef()),d=snap.val()||{};await set(roomRef(),{...d,active:false,round:(d.round||1)+1,startedAt:null,answers:{}});};
+$('resetRound').onclick=async()=>{
+ if(!room)return;
+ const snap=await get(roomRef()),d=snap.val()||{};
+ await set(roomRef(),{
+  ...d,
+  active:false,
+  round:(d.round||1)+1,
+  startedAt:null,
+  answers:{}
+ });
+};
 $('joinButton').onclick=async()=>{
  if(!db)return;const code=$('joinCode').value.trim().toUpperCase(),n=$('teamSelect').value;
  if(!/^[A-Z0-9]{6}$/.test(code)||!n){$('joinMessage').textContent="請輸入六位加入碼並選擇組別。";return}
